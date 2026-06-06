@@ -178,6 +178,31 @@
     .btn-primary:hover { opacity: 0.85; }
     .btn-primary:disabled { opacity: 0.35; cursor: default; }
     .btn-primary:disabled:hover { opacity: 0.35; }
+    .btn-play {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 3px 7px;
+      font-size: 11px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+      width: 28px;
+      text-align: center;
+    }
+    .btn-play:hover { background: var(--accent); color: var(--accent-text); }
+    .btn-play.playing {
+      background: #4ade80;
+      color: #000;
+      border-color: #4ade80;
+      box-shadow: 0 0 6px rgba(74,222,128,0.5);
+    }
+    .btn-play.playing:hover {
+      background: #f87171;
+      color: #000;
+      border-color: #f87171;
+      box-shadow: 0 0 6px rgba(248,113,113,0.5);
+    }
     .btn-import[disabled] { position: relative; }
     td.actions { text-align: right; white-space: nowrap; }
 
@@ -326,6 +351,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<audio id="previewPlayer" style="display:none"></audio>
 
 <script>
   function closeWithResult(result) {
@@ -570,6 +596,7 @@
           <td class="track-meta">${fmt(t.bpm)}</td>
           <td class="track-meta">${fmt(t.duration)}</td>
           <td class="actions">
+            ${t.uuid ? `<button class="btn btn-sm btn-play" data-uuid="${esc(t.uuid)}" onclick="doPreview('${esc(t.uuid)}','${esc(t.title)}')" ${!isSignedIn ? "disabled" : ""}>&#9654;</button>` : ""}
             <button class="btn btn-sm btn-primary btn-import" ${!isSignedIn ? "disabled" : ""} onclick="doImport('${esc(t.slug)}','${esc(t.uuid)}','${esc(t.title)}')"${!isSignedIn ? ' title="Sign in above to import"' : ""}>Import</button>
             <a href="https://mobygratis.com/api/tracks/${esc(t.slug)}" target="_blank" class="btn btn-sm" title="Open in browser">&#8599;</a>
           </td>
@@ -588,6 +615,74 @@
         btn.title = "Sign in above to import";
       }
     });
+    document.querySelectorAll(".btn-play").forEach((btn) => {
+      btn.disabled = !isSignedIn;
+    });
+  }
+
+  let currentPreviewId = null;
+
+  function setPlayButton(uuid, playing) {
+    const btn = document.querySelector(`.btn-play[data-uuid="${uuid}"]`);
+    if (!btn) return;
+    if (playing) {
+      btn.classList.add("playing");
+      btn.innerHTML = "&#9632;";
+      btn.title = "Stop";
+    } else {
+      btn.classList.remove("playing");
+      btn.innerHTML = "&#9654;";
+      btn.title = "Preview";
+    }
+  }
+
+  async function doPreview(uuid, title) {
+    if (!uuid) return;
+    const player = document.getElementById("previewPlayer");
+
+    // If clicking the same track that's currently playing, stop it
+    if (currentPreviewId === uuid && !player.paused) {
+      player.pause();
+      player.currentTime = 0;
+      setPlayButton(uuid, false);
+      currentPreviewId = null;
+      return;
+    }
+
+    // If a different track is playing, stop it first
+    if (currentPreviewId && currentPreviewId !== uuid) {
+      setPlayButton(currentPreviewId, false);
+    }
+
+    try {
+      const res = await fetch(API_BASE + "/api/preview/" + uuid);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "HTTP " + res.status }));
+        showToast("Preview failed: " + (err.error || "unknown error"), 4000);
+        return;
+      }
+      const audioUrl = await res.text();
+      if (!audioUrl) { showToast("No preview URL returned", 4000); return; }
+
+      player.src = audioUrl;
+      await player.play();
+      currentPreviewId = uuid;
+      setPlayButton(uuid, true);
+
+      player.onended = () => {
+        setPlayButton(uuid, false);
+        currentPreviewId = null;
+      };
+      player.onerror = () => {
+        if (currentPreviewId === uuid) {
+          showToast("Playback error - try importing instead", 4000);
+          setPlayButton(uuid, false);
+          currentPreviewId = null;
+        }
+      };
+    } catch (err) {
+      showToast("Preview error: " + err.message, 4000);
+    }
   }
 
   async function doImport(slug, uuid, title) {

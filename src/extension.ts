@@ -70,6 +70,26 @@ async function postText(
   });
 }
 
+async function getText(url: string, headers: Record<string, string> = {}): Promise<string> {
+  const u = parseUrl(url);
+  return new Promise((resolve, reject) => {
+    const opts: https.RequestOptions = {
+      hostname: u.hostname,
+      port: u.port,
+      path: u.path,
+      method: "GET",
+      headers,
+    };
+    const req = https.request(opts, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => resolve(data));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 async function getFile(url: string): Promise<Buffer> {
   const u = parseUrl(url);
   return new Promise((resolve, reject) => {
@@ -323,6 +343,37 @@ async function startServer(html: string): Promise<number> {
             res.end(JSON.stringify({ error: err.message }));
           }
         });
+        return;
+      }
+
+      if (req.method === "GET" && pathname.startsWith("/api/preview/")) {
+        const uuid = pathname.slice("/api/preview/".length);
+        if (uuid) {
+          (async () => {
+            try {
+              if (!authToken) {
+                res.writeHead(401, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: "Not signed in" }));
+                return;
+              }
+              console.log(`MobyGratis: fetching preview URL for ${uuid}`);
+              const previewUrl = await getText(
+                `https://mobygratis.com/api/preview/${uuid}`,
+                { Authorization: `Bearer ${authToken}` },
+              );
+              console.log(`MobyGratis: preview URL: ${previewUrl.substring(0, 80)}...`);
+              res.writeHead(200, { "Content-Type": "text/plain" });
+              res.end(previewUrl);
+            } catch (err: any) {
+              console.error("MobyGratis: preview error", err);
+              res.writeHead(500, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          })();
+        } else {
+          res.writeHead(400);
+          res.end("No UUID");
+        }
         return;
       }
 

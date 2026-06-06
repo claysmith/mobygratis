@@ -20,6 +20,7 @@ Created in `startServer()` on a random port. Endpoints:
 | GET | `/api/auth-status` | Returns `{ signedIn, email }` from stored Firebase idToken |
 | POST | `/api/verify-magic-link` | Verifies Firebase email magic link, stores idToken |
 | POST | `/api/sign-out` | Clears auth token |
+| GET | `/api/preview/<uuid>` | Proxies to `https://mobygratis.com/api/preview/<uuid>` with Bearer token, returns pre-signed audio URL as plain text |
 | POST | `/api/search` | Proxies to `https://mobygratis.com/api/search` |
 
 ### Authentication
@@ -36,6 +37,12 @@ Created in `startServer()` on a random port. Endpoints:
 6. Imports into Live project via `context.resources.importIntoProject()`
 7. Creates session clip: tries selected track's first empty clip slot; falls back to creating a new audio track
 8. All steps wrapped in `withinProgressDialog` with abort support
+
+### Track Preview
+- Play button (▶) in track listing fetches `GET /api/preview/<uuid>` → proxies to `https://mobygratis.com/api/preview/<uuid>` with Bearer token → returns pre-signed Cloudflare R2 audio URL
+- URL is set on a hidden `<audio>` element in the WebView for playback
+- Clicking the same button again stops playback; clicking another track switches playback
+- Requires sign-in (same as import)
 
 ## Key SDK Quirks
 
