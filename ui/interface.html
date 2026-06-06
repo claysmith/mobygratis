@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobyGratis</title>
+  <style>
+    :root {
+      --bg: hsl(0,0%,21%);
+      --control-bg: hsl(0,0%,16%);
+      --input-bg: hsl(0,0%,12%);
+      --text-primary: hsl(0,0%,71%);
+      --text-secondary: hsl(0,0%,41%);
+      --border: hsl(0,0%,7%);
+      --accent: hsl(31,100%,67%);
+      --accent-text: hsl(0,0%,7%);
+      --card-bg: hsl(0,0%,17%);
+      --hover-bg: hsl(0,0%,25%);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.4;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* -- Header -- */
+    header {
+      background: var(--control-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.3px;
+      white-space: nowrap;
+    }
+    header h1 span { color: var(--text-secondary); font-weight: 400; }
+    .search-bar {
+      flex: 1;
+      max-width: 400px;
+      position: relative;
+    }
+    .search-bar input {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 6px 12px 6px 28px;
+      border-radius: 4px;
+      font-size: 13px;
+      outline: none;
+    }
+    .search-bar input:focus { border-color: var(--accent); }
+    .search-bar input::placeholder { color: var(--text-secondary); }
+    .search-bar .icon {
+      position: absolute;
+      left: 8px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+    .count { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+    .license-badge {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      margin-left: auto;
+    }
+    .license-badge:hover { background: var(--accent); color: var(--accent-text); }
+
+    /* -- Auth bar -- */
+    .auth-bar {
+      padding: 10px 16px;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .auth-bar .label { font-size: 11px; color: var(--text-secondary); }
+    .btn {
+      background: var(--control-bg);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover { background: var(--hover-bg); }
+    .btn:disabled { opacity: 0.35; cursor: default; }
+
+    /* -- Main content -- */
+    main {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 10px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* -- Track table -- */
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left;
+      padding: 6px 12px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 1;
+    }
+    th:last-child { text-align: right; }
+    td {
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tr:hover { background: var(--hover-bg); }
+    .track-title { font-weight: 500; }
+    .track-mood {
+      color: var(--text-secondary);
+      font-size: 12px;
+      max-width: 170px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .track-meta { color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
+    .btn-sm { padding: 3px 8px; font-size: 11px; }
+    .btn-primary {
+      background: var(--accent);
+      color: var(--accent-text);
+      border-color: var(--accent);
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-primary:disabled { opacity: 0.35; cursor: default; }
+    .btn-primary:disabled:hover { opacity: 0.35; }
+    .btn-import[disabled] { position: relative; }
+    td.actions { text-align: right; white-space: nowrap; }
+
+    /* -- Footer -- */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 8px 16px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    .error { padding: 16px; text-align: center; color: #ff6b6b; }
+    .empty { padding: 40px; text-align: center; color: var(--text-secondary); }
+
+    /* -- License overlay -- */
+    .license-panel {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .license-panel.open { display: flex; }
+    .license-content {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 540px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .license-content h2 { font-size: 16px; color: var(--accent); margin-bottom: 12px; }
+    .license-content p { font-size: 13px; line-height: 1.6; margin-bottom: 10px; }
+    .license-content .close-license {
+      float: right;
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 22px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .license-content .close-license:hover { color: var(--text-primary); }
+
+    /* -- Toast -- */
+    .toast {
+      position: fixed;
+      bottom: 50px;
+      right: 16px;
+      background: var(--accent);
+      color: var(--accent-text);
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.25s;
+      z-index: 200;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>mobygratis</h1>
+  <div class="search-bar">
+    <span class="icon">&#128269;</span>
+    <input type="text" id="searchInput" placeholder="Search tracks..." autofocus />
+  </div>
+  <span class="count" id="trackCount">499 tracks</span>
+  <select id="trackSelect" style="background:var(--input-bg);border:1px solid var(--border);color:var(--text-primary);padding:4px 8px;border-radius:3px;font-size:12px;outline:none;max-width:160px;"></select>
+  <button class="license-badge" onclick="toggleLicense()">License</button>
+</header>
+
+<div class="auth-bar" id="authBar">
+  <span class="label">Sign in with email:</span>
+  <input type="email" id="magicEmail" placeholder="you@example.com" style="background:var(--input-bg);border:1px solid var(--border);color:var(--text-primary);padding:5px 10px;border-radius:3px;font-size:12px;outline:none;width:200px;" />
+  <button class="btn btn-sm btn-primary" id="sendMagicBtn" onclick="sendMagicLink()">Send magic link</button>
+  <span id="magicStatus" style="font-size:11px;color:var(--text-secondary);"></span>
+</div>
+
+<!-- Email magic link verification (hidden until link sent) -->
+<div id="emailMagicSection" style="display:none; padding:8px 16px; background:var(--card-bg); border-bottom:1px solid var(--border); flex-shrink:0;">
+  <label style="font-size:11px;color:var(--text-secondary);margin-right:6px;">Paste the link from your email:</label>
+  <input type="url" id="magicLinkInput" placeholder="https://mobygratis-2945d.firebaseapp.com/__/auth/action?..." style="background:var(--input-bg);border:1px solid var(--border);color:var(--text-primary);padding:5px 10px;border-radius:3px;font-size:12px;outline:none;flex:1;min-width:200px;margin-right:8px;" />
+  <button class="btn btn-sm btn-primary" onclick="verifyMagicLink()">Open &amp; sign in</button>
+  <button class="btn btn-sm" onclick="resetEmailMagic()" style="margin-left:4px;">Cancel</button>
+</div>
+
+<main id="mainContent">
+  <div class="loading"><div class="spinner"></div>Loading catalog...</div>
+</main>
+
+<footer>
+  <span>
+    Free Moby music for non-commercial projects &mdash;
+    <a href="#" onclick="toggleLicense(); return false;">License</a> &middot;
+    <a href="https://mobygratis.com" target="_blank">mobygratis.com</a>
+  </span>
+  <button class="btn btn-sm" onclick="closeWithResult(null)">Close</button>
+</footer>
+
+<!-- License overlay -->
+<div class="license-panel" id="licensePanel">
+  <div class="license-content">
+    <button class="close-license" onclick="toggleLicense()">&times;</button>
+    <h2>MobyGratis License Agreement</h2>
+    <p>
+      <strong>Free for non-commercial use.</strong> MobyGratis provides Moby's
+      music free for films, videos, choreography, student projects, remixes,
+      and other non-commercial creative work.
+    </p>
+    <p>
+      <strong>Restricted Tracks</strong> cannot be used for derivative/
+      collaborative works. <strong>Commercial use</strong> (monetized social
+      media, ads, etc.) requires a
+      <a href="mailto:mobygratis@moby.com" style="color:var(--accent);">separate license</a>.
+      <em>De minimis</em> exception: under 10,000 streams / 50,000 views
+      (excludes Restricted Tracks).
+    </p>
+    <p>
+      <strong>Prohibited:</strong> Cannot advertise right-wing politics,
+      causes, or promote meat, dairy, or animal products.
+      <strong>Attribution:</strong> credit &ldquo;mobygratis&rdquo; (not Moby
+      by name). Licenses may be terminated at any time at Moby&rsquo;s sole
+      discretion.
+    </p>
+    <p style="margin-top:14px;">
+      <a href="https://support.mobygratis.com/article/61-license-agreement"
+         target="_blank" style="color:var(--accent);font-weight:600;">
+        Read the full license agreement &rarr;
+      </a>
+    </p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  function closeWithResult(result) {
+    const payload = result !== null ? JSON.stringify(result) : "";
+    const msg = { method: "close_and_send", params: [payload] };
+    if (window.webkit?.messageHandlers?.live) {
+      window.webkit.messageHandlers.live.postMessage(msg);
+    } else if (window.chrome?.webview) {
+      window.chrome.webview.postMessage(msg);
+    }
+  }
+
+  function showToast(msg, dur) {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove("show"), dur || 2500);
+  }
+
+  function toggleLicense() {
+    document.getElementById("licensePanel").classList.toggle("open");
+  }
+
+  /* -- Email magic link -- */
+  function resetEmailMagic() {
+    document.getElementById("emailMagicSection").style.display = "none";
+    document.getElementById("magicLinkInput").value = "";
+    document.getElementById("magicStatus").textContent = "";
+  }
+
+  async function sendMagicLink() {
+    const email = document.getElementById("magicEmail").value.trim();
+    if (!email) { showToast("Enter your email address."); return; }
+
+    const btn = document.getElementById("sendMagicBtn");
+    const status = document.getElementById("magicStatus");
+    btn.disabled = true;
+    status.textContent = "Sending...";
+
+    try {
+      const res = await fetch(
+        "https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=AIzaSyCTwaxUqAP88DzfAkhVaaYAdpmfl_hh5wc",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            requestType: "EMAIL_SIGNIN",
+            email: email,
+            continueUrl: "https://mobygratis.com/login",
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+      }
+
+      status.textContent = "Magic link sent!";
+      document.getElementById("emailMagicSection").style.display = "flex";
+      document.getElementById("emailMagicSection").style.flexWrap = "wrap";
+      document.getElementById("emailMagicSection").style.alignItems = "center";
+      document.getElementById("magicLinkInput").focus();
+      showToast("Email sent! Paste the link you received.", 5000);
+    } catch (err) {
+      status.textContent = `Failed: ${err.message}`;
+      showToast(`Error: ${err.message}`, 4000);
+    }
+    btn.disabled = false;
+  }
+
+  async function verifyMagicLink() {
+    const link = document.getElementById("magicLinkInput").value.trim();
+    if (!link) { showToast("Paste the magic link from your email."); return; }
+    const email = document.getElementById("magicEmail").value.trim();
+
+    const btn = document.querySelector("#emailMagicSection .btn-primary");
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Verifying...";
+
+    try {
+      const res = await fetch(API_BASE + "/api/verify-magic-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, link }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        isSignedIn = true;
+        updateImportButtons();
+        document.getElementById("authBar").innerHTML =
+          '<span style="font-size:12px;color:var(--accent);font-weight:600;">\u2713 Signed in as ' +
+          esc(data.email) +
+          '</span> <button class="btn btn-sm" onclick="signOut()">Sign out</button>';
+        document.getElementById("emailMagicSection").style.display = "none";
+        document.getElementById("magicStatus").textContent = "";
+        showToast("Signed in successfully!", 3000);
+      } else {
+        showToast("Sign in failed: " + (data.error || "unknown error"), 5000);
+      }
+    } catch (err) {
+      showToast("Error: " + err.message, 5000);
+    }
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+
+  async function signOut() {
+    try {
+      await fetch(API_BASE + "/api/sign-out", { method: "POST" });
+    } catch {}
+    isSignedIn = false;
+    updateImportButtons();
+    document.getElementById("authBar").innerHTML =
+      '<span class="label">Sign in with email:</span>' +
+      '<input type="email" id="magicEmail" placeholder="you@example.com" style="background:var(--input-bg);border:1px solid var(--border);color:var(--text-primary);padding:5px 10px;border-radius:3px;font-size:12px;outline:none;width:200px;" />' +
+      '<button class="btn btn-sm btn-primary" id="sendMagicBtn" onclick="sendMagicLink()">Send magic link</button>' +
+      '<span id="magicStatus" style="font-size:11px;color:var(--text-secondary);"></span>';
+  }
+
+  async function restoreAuth() {
+    try {
+      const res = await fetch(API_BASE + "/api/auth-status");
+      const data = await res.json();
+      if (data.signedIn) {
+        isSignedIn = true;
+        document.getElementById("authBar").innerHTML =
+          '<span style="font-size:12px;color:var(--accent);font-weight:600;">\u2713 Signed in as ' +
+          esc(data.email) +
+          '</span> <button class="btn btn-sm" onclick="signOut()">Sign out</button>';
+      }
+    } catch {}
+  }
+
+  /* -- Catalog search -- */
+  const API_BASE = "__API_BASE__";
+  const SEARCH_URL = API_BASE + "/api/search";
+  let currentPage = 1;
+  let isLoading = false;
+  let searchTimeout = null;
+  let allTracks = [];
+  let isSignedIn = false;
+
+  function esc(s) {
+    if (!s) return "";
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+            .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
+
+  async function loadTracks(page, query) {
+    if (isLoading) return;
+    isLoading = true;
+    const main = document.getElementById("mainContent");
+    main.innerHTML = '<div class="loading"><div class="spinner"></div>Loading tracks...</div>';
+
+    try {
+      const body = new URLSearchParams({
+        search: query || "",
+        type: "",
+        page: String(page),
+        sort: "Random",
+        bpm_min: "0",
+        bpm_max: "500",
+        prefix: query || "",
+      });
+      const res = await fetch(SEARCH_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const html = await res.text();
+      parseResults(html, page);
+    } catch (err) {
+      main.innerHTML = `<div class="error"><strong>Could not load the catalog.</strong><br>Sign in with magic link above and try again, or check your connection.</div>`;
+    }
+    isLoading = false;
+  }
+
+  function parseResults(html, page) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const rows = doc.querySelectorAll("tr");
+    const tracks = [];
+
+    rows.forEach((row) => {
+      const titleEl = row.querySelector(".truncate.lowercase");
+      if (!titleEl) return;
+      const title = titleEl.textContent.trim();
+      const slug = title.replace(/\s+/g, "-").toLowerCase();
+
+      const moodEl = row.querySelector('[title="track mood"]');
+      const mood = moodEl ? moodEl.textContent.trim() : "";
+
+      const spans = row.querySelectorAll("td span");
+      let bpm = "", duration = "";
+      spans.forEach((s) => {
+        const t = s.textContent.trim();
+        if (/^\d{2,3}$/.test(t) && !bpm) bpm = t;
+        if (/^\d+:\d+$/.test(t) && !duration) duration = t;
+      });
+
+      let uuid = "";
+      const btns = row.querySelectorAll("button[x-data]");
+      btns.forEach((b) => {
+        const clickAttr = b.getAttribute("@click") || b.getAttribute("x-on:click") || "";
+        const m = clickAttr.match(/\$store\.player\.(?:play|queueTrack)\("([^"]+)"/);
+        if (m) uuid = m[1];
+      });
+
+      tracks.push({ title, slug, mood, bpm, duration, uuid });
+    });
+
+    allTracks = page === 1 ? tracks : [...allTracks, ...tracks];
+    renderTracks(tracks, page);
+  }
+
+  function renderTracks(tracks, page) {
+    const main = document.getElementById("mainContent");
+    document.getElementById("trackCount").textContent =
+      `${allTracks.length} track${allTracks.length !== 1 ? "s" : ""}`;
+
+    if (tracks.length === 0 && page === 1) {
+      main.innerHTML = '<div class="empty">No tracks found. Try a different search.</div>';
+      return;
+    }
+
+    const fmt = (s) => s || "\u2014";
+
+    const importNote = !isSignedIn
+      ? '<p style="padding:8px 12px;font-size:11px;color:var(--text-secondary);border-bottom:1px solid var(--border);">Import requires signing in above.</p>'
+      : "";
+
+    main.innerHTML =
+      importNote +
+      '<table><thead><tr><th>Track</th><th>Mood</th><th style="width:50px;">BPM</th><th style="width:56px;">Time</th><th style="width:130px;"></th></tr></thead><tbody>' +
+      tracks.map((t) =>
+        `<tr>
+          <td><span class="track-title">${esc(t.title)}</span></td>
+          <td><span class="track-mood" title="${esc(t.mood)}">${esc(t.mood) || "\u2014"}</span></td>
+          <td class="track-meta">${fmt(t.bpm)}</td>
+          <td class="track-meta">${fmt(t.duration)}</td>
+          <td class="actions">
+            <button class="btn btn-sm btn-primary btn-import" ${!isSignedIn ? "disabled" : ""} onclick="doImport('${esc(t.slug)}','${esc(t.uuid)}','${esc(t.title)}')"${!isSignedIn ? ' title="Sign in above to import"' : ""}>Import</button>
+            <a href="https://mobygratis.com/api/tracks/${esc(t.slug)}" target="_blank" class="btn btn-sm" title="Open in browser">&#8599;</a>
+          </td>
+        </tr>`
+      ).join("") +
+      '</tbody></table>';
+  }
+
+  function updateImportButtons() {
+    document.querySelectorAll(".btn-import").forEach((btn) => {
+      if (isSignedIn) {
+        btn.disabled = false;
+        btn.title = "";
+      } else {
+        btn.disabled = true;
+        btn.title = "Sign in above to import";
+      }
+    });
+  }
+
+  async function doImport(slug, uuid, title) {
+    if (!isSignedIn) {
+      showToast("Sign in above to import tracks.", 4000);
+      return;
+    }
+    if (!uuid) {
+      showToast("Cannot import \u2014 track UUID not found. Try opening in browser.", 4000);
+      return;
+    }
+    const sel = document.getElementById("trackSelect");
+    const trackIndex = parseInt(sel.value, 10);
+    if (isNaN(trackIndex)) {
+      showToast("Select a target track from the dropdown.", 4000);
+      return;
+    }
+    showToast(`Importing "${title}"...`, 10000);
+    closeWithResult({ action: "import", slug, uuid, format: "WAV", trackIndex });
+  }
+
+  async function loadTrackList() {
+    try {
+      const res = await fetch(API_BASE + "/api/tracks");
+      if (!res.ok) return;
+      const tracks = await res.json();
+      const sel = document.getElementById("trackSelect");
+      sel.innerHTML = tracks.map((t, i) =>
+        `<option value="${t.index}">${i + 1}: ${esc(t.name)}</option>`
+      ).join("");
+      if (tracks.length > 0) sel.selectedIndex = 0;
+    } catch {}
+  }
+
+  /* -- Search on input -- */
+  document.getElementById("searchInput").addEventListener("input", (e) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      currentPage = 1;
+      allTracks = [];
+      loadTracks(1, e.target.value);
+    }, 350);
+  });
+
+  /* -- Initial load -- */
+  restoreAuth();
+  loadTrackList();
+  loadTracks(1, "");
+</script>
+</body>
+</html>
