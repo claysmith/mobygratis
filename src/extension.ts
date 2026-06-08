@@ -10,6 +10,7 @@ const FIREBASE_AUTH_URL = "https://identitytoolkit.googleapis.com/v1";
 
 let authToken: string | null = null;
 let authEmail: string | null = null;
+let authExpireTimer: ReturnType<typeof setTimeout> | null = null;
 let server: Server | null = null;
 let appContext: ReturnType<typeof initialize> | null = null;
 
@@ -26,6 +27,17 @@ function qs(params: Record<string, string>): string {
 
 function decodeHtmlEntities(text: string): string {
   return text.replace(/&#x2F;/g, "/").replace(/&amp;/g, "&");
+}
+
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const json = Buffer.from(payload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
 }
 
 function parseUrl(url: string): { hostname: string; port: string; path: string } {
@@ -142,6 +154,22 @@ async function verifyMagicLink(email: string, link: string) {
   const tokenData = JSON.parse(verifyRes.text) as { idToken: string; refreshToken: string; email: string };
   authToken = tokenData.idToken;
   authEmail = tokenData.email;
+
+  // Auto sign-out when the Firebase idToken expires
+  if (authExpireTimer) clearTimeout(authExpireTimer);
+  const payload = decodeJwtPayload(tokenData.idToken);
+  if (payload?.exp) {
+    const expiresInMs = payload.exp * 1000 - Date.now();
+    if (expiresInMs > 0) {
+      authExpireTimer = setTimeout(() => {
+        authToken = null;
+        authEmail = null;
+        authExpireTimer = null;
+        console.log("MobyGratis: session expired, auto signed out");
+      }, expiresInMs);
+    }
+  }
+
   console.log(`MobyGratis: signed in as ${authEmail}`);
 }
 
@@ -315,6 +343,7 @@ async function startServer(html: string): Promise<number> {
       if (req.method === "POST" && pathname === "/api/sign-out") {
         authToken = null;
         authEmail = null;
+        if (authExpireTimer) { clearTimeout(authExpireTimer); authExpireTimer = null; }
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true }));
         return;
@@ -397,7 +426,7 @@ function stopServer() {
 }
 
 export function activate(activation: ActivationContext) {
-  const context = initialize(activation, "1.0.0");
+  const context = initialize(activation, "1.0.1");
   appContext = context;
 
   context.commands.registerCommand("mobygratis.showDialog", async () => {

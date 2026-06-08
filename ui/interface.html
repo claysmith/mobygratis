@@ -727,10 +727,29 @@
     }, 350);
   });
 
+  /* -- Auth polling for session expiry -- */
+  let lastAuthStatus = null;
+  async function pollAuth() {
+    try {
+      const res = await fetch(API_BASE + "/api/auth-status");
+      const data = await res.json();
+      if (lastAuthStatus === null) {
+        lastAuthStatus = data.signedIn;
+      } else if (data.signedIn !== lastAuthStatus) {
+        lastAuthStatus = data.signedIn;
+        if (!data.signedIn) {
+          signOut();
+          showToast("Session expired. Sign in again to continue.", 5000);
+        }
+      }
+    } catch {}
+  }
+
   /* -- Initial load -- */
   restoreAuth();
   loadTrackList();
   loadTracks(1, "");
+  setInterval(pollAuth, 15000);
 </script>
 </body>
 </html>
